@@ -13,8 +13,8 @@ export default function Welcome() {
     const [error, setError] = useState<string>('');
     const [copiedItem, setCopiedItem] = useState<'fileName' | 'code' | null>(null);
 
-    // Field overrides: Map of "ClassName.fieldName" -> { isNullable: boolean }
-    const [fieldOverrides, setFieldOverrides] = useState<Record<string, { isNullable: boolean }>>({});
+    // Field overrides: Map of "ClassName.fieldName" -> { isNullable?: boolean, type?: string }
+    const [fieldOverrides, setFieldOverrides] = useState<Record<string, { isNullable?: boolean; type?: string }>>({});
 
     const theme = 'vs-dark';
     const fileName = (rootClassName || 'Root').replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase() + '.dart';
@@ -50,7 +50,7 @@ export default function Welcome() {
             properties: cls.properties.map(prop => {
                 const overrideKey = `${cls.className}.${prop.name}`;
                 if (fieldOverrides[overrideKey] !== undefined) {
-                    return { ...prop, isNullable: fieldOverrides[overrideKey].isNullable };
+                    return { ...prop, ...fieldOverrides[overrideKey] };
                 }
                 return prop;
             })
@@ -69,7 +69,15 @@ export default function Welcome() {
         const key = `${className}.${propName}`;
         setFieldOverrides(prev => ({
             ...prev,
-            [key]: { isNullable }
+            [key]: { ...prev[key], isNullable }
+        }));
+    };
+
+    const handleFieldTypeChange = (className: string, propName: string, type: string) => {
+        const key = `${className}.${propName}`;
+        setFieldOverrides(prev => ({
+            ...prev,
+            [key]: { ...prev[key], type }
         }));
     };
 
@@ -188,25 +196,43 @@ export default function Welcome() {
                                     <div className="divide-y divide-[#e3e3e0] dark:divide-[#3E3E3A]">
                                         {cls.properties.map(prop => {
                                             const overrideKey = `${cls.className}.${prop.name}`;
-                                            const isNullable = fieldOverrides[overrideKey] !== undefined ? fieldOverrides[overrideKey].isNullable : nullable;
-
+                                            const isNullable = fieldOverrides[overrideKey]?.isNullable !== undefined ? fieldOverrides[overrideKey].isNullable : nullable;
+                                            const currentType = fieldOverrides[overrideKey]?.type !== undefined ? fieldOverrides[overrideKey].type : prop.type;
+                                            
+                                            const standardTypes = ['String', 'int', 'double', 'bool', 'dynamic'];
+                                            const typeOptions = standardTypes.includes(prop.type) ? standardTypes : [prop.type, ...standardTypes];
+                                            
                                             return (
-                                                <div key={prop.name} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-[#fafaf9] dark:hover:bg-[#1a1a1a] transition-colors">
+                                                <div key={prop.name} className="flex flex-col xl:flex-row xl:items-center justify-between px-3 py-2 text-sm hover:bg-[#fafaf9] dark:hover:bg-[#1a1a1a] transition-colors gap-2">
                                                     <div className="flex items-center gap-2 overflow-hidden mr-2">
-                                                        <span className="font-mono text-[#f53003] dark:text-[#FF4433] truncate text-[13px]" title={prop.name}>{prop.name}</span>
-                                                        <span className="text-[11px] text-[#706f6c] dark:text-[#A1A09A] px-2 py-0.5 bg-[#e3e3e0] dark:bg-[#3E3E3A] rounded-full truncate shrink-0">
-                                                            {prop.isList ? `List<${prop.type}>` : prop.type}
-                                                        </span>
+                                                        <span className="font-mono text-[#f53003] dark:text-[#FF4433] truncate text-[13px] font-semibold" title={prop.name}>{prop.name}</span>
+                                                        {prop.isList && (
+                                                            <span className="text-[11px] text-[#706f6c] dark:text-[#A1A09A] px-1.5 py-0.5 bg-[#e3e3e0] dark:bg-[#3E3E3A] rounded-md shrink-0 border border-[#e3e3e0] dark:border-[#3E3E3A]">
+                                                                List
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isNullable}
-                                                            onChange={(e) => handleFieldNullableChange(cls.className, prop.name, e.target.checked)}
-                                                            className="h-3.5 w-3.5 rounded border-[#e3e3e0] text-[#f53003] focus:ring-[#f53003] dark:border-[#3E3E3A] dark:bg-[#0a0a0a]"
-                                                        />
-                                                        <span className="text-[12px] text-[#706f6c] dark:text-[#A1A09A]">Nullable</span>
-                                                    </label>
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <select
+                                                            value={currentType}
+                                                            onChange={(e) => handleFieldTypeChange(cls.className, prop.name, e.target.value)}
+                                                            className="text-[11px] text-[#1b1b18] dark:text-[#EDEDEC] bg-[#e3e3e0] dark:bg-[#3E3E3A] border-none rounded-md px-2 py-1 focus:ring-1 focus:ring-[#f53003] outline-none cursor-pointer"
+                                                        >
+                                                            {typeOptions.map(t => (
+                                                                <option key={t} value={t}>{t}</option>
+                                                            ))}
+                                                        </select>
+                                                        
+                                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                                            <input 
+                                                                type="checkbox"
+                                                                checked={isNullable}
+                                                                onChange={(e) => handleFieldNullableChange(cls.className, prop.name, e.target.checked)}
+                                                                className="h-3.5 w-3.5 rounded border-[#e3e3e0] text-[#f53003] focus:ring-[#f53003] dark:border-[#3E3E3A] dark:bg-[#0a0a0a]"
+                                                            />
+                                                            <span className="text-[12px] text-[#706f6c] dark:text-[#A1A09A]">Nullable</span>
+                                                        </label>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
